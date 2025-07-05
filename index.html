@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+  <meta name="theme-color" content="#007bff">
+<script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('service-worker.js')
+      .then(() => console.log("Service Worker registered"));
+  }
+</script>
+  <title>Prank Idea Generator</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      display: flex;
+      flex-direction: row;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    @media (max-width: 768px) {
+      body {
+        flex-direction: column;
+      }
+      #sidebar, #savedList {
+        width: 100%;
+        height: auto;
+        border: none;
+        border-bottom: 1px solid #ccc;
+      }
+    }
+
+    body.dark {
+      background: #121212;
+      color: white;
+    }
+
+    #sidebar {
+      width: 220px;
+      background: #fff;
+      border-right: 1px solid #ccc;
+      padding: 1rem;
+      box-sizing: border-box;
+      overflow-y: auto;
+    }
+
+    body.dark #sidebar {
+      background: #1c1c1c;
+      border-color: #444;
+    }
+
+    #main {
+      flex: 1;
+      padding: 2rem;
+      text-align: center;
+      overflow-y: auto;
+    }
+
+    #savedList {
+      width: 300px;
+      background: #fff;
+      border-left: 1px solid #ccc;
+      padding: 1rem;
+      overflow-y: auto;
+    }
+
+    body.dark #savedList {
+      background: #1c1c1c;
+      border-color: #444;
+    }
+
+    h1 {
+      margin-top: 0;
+    }
+
+    .big-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 1rem;
+      margin-top: 1.5rem;
+    }
+
+    .big-buttons button {
+      background: #007bff;
+      color: white;
+      border: none;
+      padding: 1rem 2rem;
+      font-size: 1.1rem;
+      border-radius: 6px;
+      cursor: pointer;
+      min-width: 180px;
+    }
+
+    .big-buttons button:hover {
+      background: #0056b3;
+    }
+
+    #prankDisplay {
+      margin: 1.5rem auto;
+      max-width: 600px;
+      background: white;
+      padding: 1.5rem;
+      border-radius: 8px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+      min-height: 100px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    body.dark #prankDisplay {
+      background: #1e1e1e;
+      color: white;
+    }
+
+    #savedPranks li {
+      margin: 0.5rem 0;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .delete-btn {
+      background: red;
+      color: white;
+      border: none;
+      padding: 0.3rem 0.6rem;
+      border-radius: 4px;
+      font-size: 0.9rem;
+      cursor: pointer;
+    }
+
+    .sidebar-section {
+      margin-bottom: 1rem;
+    }
+
+    .sidebar-section h3 {
+      font-size: 1rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .sidebar-section button,
+    .sidebar-section label.upload-label {
+      display: block;
+      width: 100%;
+      margin: 0.3rem 0;
+      padding: 0.5rem;
+      font-size: 0.9rem;
+      border-radius: 6px;
+      border: none;
+      background: #007bff;
+      color: white;
+      cursor: pointer;
+      text-align: left;
+    }
+
+    .sidebar-section button:hover,
+    .sidebar-section label.upload-label:hover {
+      background: #0056b3;
+    }
+
+    input[type="file"] {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <!-- Sidebar -->
+  <div id="sidebar">
+    <div class="sidebar-section">
+      <h3>⚙️ Settings</h3>
+      <button onclick="toggleDarkMode()">🌙 Dark Mode</button>
+      <button onclick="clearSaved()">🗑 Clear List</button>
+    </div>
+    <div class="sidebar-section">
+      <h3>📤 Share & Save</h3>
+      <button onclick="downloadSaved()">💾 Download</button>
+      <button onclick="shareLink()">🔗 Share Link</button>
+      <label class="upload-label">📁 Upload List
+        <input type="file" accept=".txt" onchange="uploadList(event)" />
+      </label>
+    </div>
+  </div>
+
+  <!-- Main -->
+  <div id="main">
+    <h1>Prank Idea Generator</h1>
+    <div id="prankDisplay">Click “Get Prank Idea” to begin!</div>
+    <div class="big-buttons">
+      <button onclick="generatePrank()">🎲 Get Prank Idea</button>
+      <button onclick="shufflePranks()">🔀 Shuffle Pranks</button>
+      <button onclick="savePrank()">💾 Save This Prank</button>
+      <button onclick="addCustomPrank()">➕ Add Your Own</button>
+    </div>
+  </div>
+
+  <!-- Saved -->
+  <div id="savedList">
+    <h2>Saved Pranks</h2>
+    <ul id="savedPranks"></ul>
+  </div>
+
+  <script>
+    const prankList = [
+      "Put clear tape over the sensor of the TV remote.",
+      "Replace sugar with salt in the sugar bowl.",
+      "Put a piece of plastic wrap under the toilet seat.",
+      "Put a small piece of paper under a computer mouse sensor.",
+      "Fill someone's shoes with uncooked rice.",
+      "Put food coloring drops in the milk carton.",
+      "Swap the contents of two cereal boxes.",
+      "Put googly eyes on items in the fridge.",
+      "Tape an airhorn under a chair.",
+      "Freeze a bowl of cereal overnight.",
+      "Put a few drops of vinegar in the showerhead.",
+      "Put salt in the coffee grounds.",
+      "Replace soap with a bar of cheese wrapped in soap paper.",
+      "Wrap a door handle with cling film.",
+      "Set all clocks forward or backward by one hour.",
+      "Cover the faucet with plastic wrap so water sprays everywhere.",
+      "Put a little bit of clear gelatin in someone's drink.",
+      "Swap the keyboard keys around (for mechanical keyboards).",
+      "Put a fake spider or bug in a lampshade.",
+      "Put toothpaste on a toothbrush for someone else.",
+      "Put a rubber band around the sink sprayer handle.",
+      "Put a tiny piece of paper on the bottom of a computer mouse.",
+      "Swap salt and sugar packets in the kitchen.",
+      "Put a note inside a book saying 'You’ve been pranked!'",
+      "Set an alarm clock to go off in the middle of the night.",
+      "Put whipped cream on a door handle.",
+      "Put ketchup packets under a chair cushion.",
+      "Freeze coins in an ice cube tray and give them in a drink.",
+      "Switch cereal bags inside the boxes.",
+      "Put a few drops of food coloring in a toothpaste tube.",
+      "Put cling film over a doorway at face height.",
+      "Put googly eyes on all the fruit in a bowl.",
+      "Add salt to a cup of hot chocolate.",
+      "Put bubble wrap under a rug.",
+      "Put clear nail polish on a bar of soap so it won’t lather.",
+      "Put a rubber band around the spray nozzle of the sink.",
+      "Fill a room with balloons.",
+      "Put tape over a phone speaker.",
+      "Put a small piece of tape over the optical sensor on a remote control.",
+      "Put a whoopee cushion on a chair.",
+      "Add a fake bug in a lampshade.",
+      "Put shaving cream on a door handle.",
+      "Cover a doorway with sticky notes.",
+      "Put salt in the sugar bowl.",
+      "Put salt on toothbrush bristles.",
+      "Put a note saying 'Kick me' on someone's back.",
+      "Put clear tape on the bottom of a computer mouse.",
+      "Put salt in a sugar container.",
+      "Put a few drops of food coloring in the showerhead.",
+      "Cover a bar of soap with clear nail polish.",
+      "Put plastic wrap on a doorway at mouth level.",
+      "Freeze someone's keys in a block of ice.",
+      "Put a fake spider inside a lampshade.",
+      "Swap the sugar and salt containers.",
+      "Put a small piece of tape on the TV remote sensor.",
+      "Put a balloon behind a door so it pops when opened.",
+      "Fill a drawer with packing peanuts.",
+      "Put a fake cockroach in the fridge.",
+      "Put a small amount of ketchup on a door handle.",
+      "Put toothpaste in the cookie filling.",
+      "Put plastic wrap on a toilet seat.",
+      "Switch the lids on shampoo and conditioner bottles.",
+      "Put salt in the coffee maker water reservoir.",
+      "Put glue on a door handle (use washable glue).",
+      "Put tape on the bottom of the computer mouse.",
+      "Put food coloring in the milk carton.",
+      "Put sugar in the salt shaker.",
+      "Put tape on the faucet nozzle.",
+      "Put a whoopee cushion on a chair.",
+      "Put a fake bug in a lamp.",
+      "Put plastic wrap under a toilet seat.",
+      "Put salt on a toothbrush.",
+      "Put clear tape on the remote sensor.",
+      "Swap cereal box contents.",
+      "Put fake spiders on the ceiling.",
+      "Put tape on the mouse sensor.",
+      "Put salt in coffee grounds.",
+      "Put food coloring in water bottle.",
+      "Put tape on the showerhead.",
+      "Put a fake snake in a drawer.",
+      "Put a note 'Kick me' on someone's back.",
+      "Put salt in sugar bowl.",
+      "Put clear wrap on the door frame.",
+      "Put toothpaste in cookies.",
+      "Put a balloon under the chair cushion.",
+      "Put salt on the toilet paper roll.",
+      "Put plastic wrap on the sink faucet.",
+      "Put fake bugs in lampshades.",
+      "Put food coloring in the toothpaste.",
+      "Put salt in the cereal box.",
+      "Put tape over computer mouse sensor.",
+      "Put tape over TV remote sensor.",
+      "Swap sugar and salt.",
+      "Put cling film on door handles.",
+      "Put a fake spider in the bathroom.",
+      "Put salt in the coffee maker.",
+      "Put a whoopee cushion on the seat.",
+      "Put toothpaste on a door handle.",
+      "Put salt in sugar container.",
+      "Put a note inside a book.",
+      "Put plastic wrap on the toilet seat.",
+      "Put tape on the faucet.",
+      "Put salt on toothbrush.",
+      "Put a balloon behind a door.",
+      "Put a fake bug on the wall.",
+      "Put food coloring in milk carton.",
+      "Put salt in coffee grounds.",
+      "Put tape on the computer mouse sensor.",
+      "Put a fake spider in the lampshade.",
+      "Put salt in sugar bowl.",
+      "Put plastic wrap over a doorway.",
+      "Put a balloon under a chair cushion.",
+      "Put salt on toilet paper roll.",
+      "Put a fake bug in a drawer.",
+      "Put food coloring in toothpaste.",
+      "Put salt in cereal box.",
+      "Put tape on TV remote sensor.",
+      "Put cling film on door handles.",
+      "Put a whoopee cushion on a chair.",
+      "Put toothpaste on door handle.",
+      "Put salt in sugar container.",
+      "Put a note inside a book.",
+      "Put plastic wrap on toilet seat.",
+      "Put tape on faucet.",
+      "Put salt on toothbrush.",
+      "Put balloon behind door.",
+      "Put fake bug on wall.",
+      "Put food coloring in milk carton.",
+      "Put salt in coffee grounds."
+    ];
+
+    let currentIndex = 0;
+    let prankOrder = [...prankList];
+    let currentPrank = "";
+
+    function generatePrank() {
+      if (prankOrder.length === 0) return;
+      currentPrank = prankOrder[currentIndex];
+      document.getElementById("prankDisplay").textContent = currentPrank;
+      currentIndex = (currentIndex + 1) % prankOrder.length;
+    }
+
+    function shufflePranks() {
+      for (let i = prankOrder.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [prankOrder[i], prankOrder[j]] = [prankOrder[j], prankOrder[i]];
+      }
+      currentIndex = 0;
+      document.getElementById("prankDisplay").textContent = "Pranks shuffled! Click again.";
+    }
+
+    function savePrank() {
+      if (!currentPrank) return;
+      const li = document.createElement("li");
+      li.textContent = currentPrank;
+
+      const btn = document.createElement("button");
+      btn.textContent = "X";
+      btn.className = "delete-btn";
+      btn.onclick = () => {
+        li.remove();
+        updateStorage();
+      };
+
+      li.appendChild(btn);
+      document.getElementById("savedPranks").appendChild(li);
+      updateStorage();
+    }
+
+    function addCustomPrank() {
+      const custom = prompt("Enter your prank idea:");
+      if (custom && custom.trim()) {
+        currentPrank = custom.trim();
+        document.getElementById("prankDisplay").textContent = currentPrank;
+      }
+    }
+
+    function clearSaved() {
+      document.getElementById("savedPranks").innerHTML = "";
+      localStorage.removeItem("savedPranks");
+    }
+
+    function toggleDarkMode() {
+      document.body.classList.toggle("dark");
+    }
+
+    function updateStorage() {
+      const pranks = [];
+      document.querySelectorAll("#savedPranks li").forEach(li => {
+        pranks.push(li.firstChild.textContent);
+      });
+      localStorage.setItem("savedPranks", JSON.stringify(pranks));
+    }
+
+    function loadSaved() {
+      const saved = JSON.parse(localStorage.getItem("savedPranks") || "[]");
+      saved.forEach(p => {
+        const li = document.createElement("li");
+        li.textContent = p;
+        const btn = document.createElement("button");
+        btn.textContent = "X";
+        btn.className = "delete-btn";
+        btn.onclick = () => {
+          li.remove();
+          updateStorage();
+        };
+        li.appendChild(btn);
+        document.getElementById("savedPranks").appendChild(li);
+      });
+    }
+
+    function downloadSaved() {
+      const items = [];
+      document.querySelectorAll("#savedPranks li").forEach(li => {
+        items.push(li.firstChild.textContent);
+      });
+      const blob = new Blob([items.join("\n")], { type: "text/plain" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "my-pranks.txt";
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function uploadList(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = e => {
+        const lines = e.target.result.split("\n").filter(Boolean);
+        lines.forEach(p => {
+          const li = document.createElement("li");
+          li.textContent = p;
+          const btn = document.createElement("button");
+          btn.textContent = "X";
+          btn.className = "delete-btn";
+          btn.onclick = () => {
+            li.remove();
+            updateStorage();
+          };
+          li.appendChild(btn);
+          document.getElementById("savedPranks").appendChild(li);
+        });
+        updateStorage();
+      };
+      reader.readAsText(file);
+    }
+
+    function shareLink() {
+      const items = [];
+      document.querySelectorAll("#savedPranks li").forEach(li => {
+        items.push(li.firstChild.textContent);
+      });
+      const data = encodeURIComponent(JSON.stringify(items));
+      const url = `${location.origin}${location.pathname}?list=${data}`;
+      navigator.clipboard.writeText(url).then(() =>
+        alert("Shareable link copied to clipboard!")
+      );
+    }
+
+    window.onload = function () {
+      const params = new URLSearchParams(location.search);
+      const list = params.get("list");
+      if (list) {
+        try {
+          const decoded = JSON.parse(decodeURIComponent(list));
+          decoded.forEach(p => {
+            const li = document.createElement("li");
+            li.textContent = p;
+            const btn = document.createElement("button");
+            btn.textContent = "X";
+            btn.className = "delete-btn";
+            btn.onclick = () => {
+              li.remove();
+              updateStorage();
+            };
+            li.appendChild(btn);
+            document.getElementById("savedPranks").appendChild(li);
+          });
+          updateStorage();
+        } catch {
+          alert("Could not load prank list from link.");
+        }
+      } else {
+        loadSaved();
+      }
+    };
+  </script>
+</body>
+</html>
